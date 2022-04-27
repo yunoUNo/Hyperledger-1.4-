@@ -23,8 +23,6 @@ docker exec cli peer chaincode query -n simpleasset -C mychannel -c '{"Args":["h
 sleep 3
 docker exec cli peer chaincode query -n simpleasset -C mychannel -c '{"Args":["history","b"]}'
 
-# 5. del 
-docker exec cli peer chaincode invoke -n simpleasset -C mychannel -c '{"Args":["del","b"]}'
-
-docker exec cli peer chaincode query -n simpleasset -C mychannel -c '{"Args":["get","b"]}'
+# 5. 전체 검색
+docker exec cli peer chaincode query -n simpleasset -C mychannel -c '{"Args":["checkAll"]}'
 
