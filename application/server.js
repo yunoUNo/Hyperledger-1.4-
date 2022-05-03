@@ -46,7 +46,7 @@ app.post('/user', async(req,res)=>{
         const id = req.body.id;
         const pw = req.body.pw;
 
-        console.log('/user-post-'+id+' '+pw);
+        console.log('/user-post-'+id+'-'+pw);
 
         try {
 
@@ -77,12 +77,12 @@ app.post('/user', async(req,res)=>{
 
             // 오류 전송 추가
             const obj = JSON.parse('{"PAYLOAD": "Successfully enrolled admin user "admin" and imported it into the wallet"}');
-            response.status(200).json(obj);
+            res.status(200).json(obj);
         } catch (error) {
             console.error(`Failed to enroll admin user "admin": ${error}`);
             
             const obj = JSON.parse(`{"ERR_MSG":"Failed to enroll admin user admin : ${error}"}`);
-            response.status(400).json(obj);
+            res.status(400).json(obj);
         }
     }
     else if (mode==2){
@@ -142,6 +142,7 @@ app.post('/user', async(req,res)=>{
 })
 // 자산생성
 app.post('/asset', async(req,res)=>{
+    const id = req.body.id;
     const key = req.body.key;
     const value = req.body.value;
     console.log('asset-post-'+key+'-'+value);
@@ -151,17 +152,16 @@ app.post('/asset', async(req,res)=>{
     const wallet = new FileSystemWallet(walletPath);
     console.log(`Wallet path: ${walletPath}`);
 
-    const userExists = await wallet.exists('user1');
+    const userExists = await wallet.exists(id);
     if(!userExists){
-        console.log('user1 does not exists in wallet');
-        console.log('run registerUser.js to create user1 wallet');
+        console.log(`${id} does not exists in wallet`);
         res.status(401).sendFile(__dirname+ '/unauth.html');
         return;
     }
     
     // gateway open
     const gateway = new Gateway();
-    await gateway.connect(ccp, { wallet, identity: 'user1', discovery: { enabled: false}});
+    await gateway.connect(ccp, { wallet, identity: id, discovery: { enabled: false}});
     // channel connect
     const network = await gateway.getNetwork('mychannel');
     // chaincode connect
@@ -182,6 +182,7 @@ app.post('/asset', async(req,res)=>{
 
 app.get('/asset', async(req, res)=>{
     const key = req.query.key;
+    const id = req.query.id;
 
     console.log('asset-get-'+key);
 
@@ -190,17 +191,18 @@ app.get('/asset', async(req, res)=>{
     const wallet = new FileSystemWallet(walletPath);
     console.log(`Wallet path: ${walletPath}`);
 
-    const userExists = await wallet.exists('user1');
+    const userExists = await wallet.exists(id);
     if(!userExists){
-        console.log('user1 does not exists in wallet');
-        console.log('run registerUser.js to create user1 wallet');
-        res.status(401).sendFile(__dirname+ '/unauth.html');
+        console.log(`${id} does not exists in wallet`);
+        const obj = JSON.parse(`{"ERROR":"An identity for the user ${id} does not exist in the wallet"}`);
+
+        res.status(400).json(obj);
         return;
     }
     
     // gateway open
     const gateway = new Gateway();
-    await gateway.connect(ccp, { wallet, identity: 'user1', discovery: { enabled: false}});
+    await gateway.connect(ccp, { wallet, identity: id, discovery: { enabled: false}});
     // channel connect
     const network = await gateway.getNetwork('mychannel');
     // chaincode connect
@@ -213,13 +215,58 @@ app.get('/asset', async(req, res)=>{
     await gateway.disconnect();
 
     // result.html
-    const resultPath = path.join(process.cwd(), '/views/result.html');
-    var resultHTML = fs.readFileSync(resultPath, 'utf8');
-    resultHTML = resultHTML.replace("<div></div>", `<div><p>Tx has been evalueated: ${txResult}</p></div>`);
-    res.status(200).send(resultHTML);
+    // const resultPath = path.join(process.cwd(), '/views/result.html');
+    // var resultHTML = fs.readFileSync(resultPath, 'utf8');
+    // resultHTML = resultHTML.replace("<div></div>", `<div><p>Tx has been evalueated: ${txResult}</p></div>`);
+    const obj = JSON.parse(txResult);
+    res.status(200).send(obj);
     
 })
 
+app.get('/assets', async(req, res)=>{
+    const key= req.query.key;
+    const id= req.query.id;
+    console.log('/assets-get-'+key);
+
+    const walletPath = path.join(process.cwd(), 'wallet');
+    const wallet = new FileSystemWallet(walletPath);  
+    console.log(`Wallet path: ${walletPath}`);
+    const userExists = await wallet.exists(id);
+    if(!userExists){
+        console.log(`History ${id} does not exists in the wallet`);
+        res.status(401).sendFile(__dirname+'/unauth.html');
+        return;
+    }
+
+    const gateway = new Gateway();
+    await gateway.connect(ccp, { wallet, identity: id, discovery: { enabled: false}});
+    const network = await gateway.getNetwork('mychannel');
+    const contract = network.getContract('simpleasset');
+    const txresult = await contract.evaluateTransaction('history', key);
+    console.log('Tx has been evaluated: '+ txresult);
+
+    await gateway.disconnect();
+    
+    const resultPath = path.join(process.cwd(), '/views/result.html')
+    var resultHTML = fs.readFileSync(resultPath, 'utf8');
+
+    var tableHTML="\n<table class=\"table table-bordered\">";
+
+    const txs = JSON.parse(txresult);
+
+    for(var i=0 ; i<txs.length; i++)
+    {
+        tableHTML+="<tr><td>TxId</td>";
+        tableHTML=tableHTML+"<td>"+txs[i].TxId+"</td></tr>";
+        tableHTML+="<tr><td>Timestamp</td>";
+        tableHTML=tableHTML+"<td>"+txs[i].Timestamp+"</td></tr>";
+        tableHTML+="\n";
+    }
+    tableHTML+="</table>\n";
+
+    resultHTML = resultHTML.replace("<div></div>", `<div><p>Transaction has been evaluated:</p><br> ${tableHTML}</div>\n`);
+    res.status(200).send(resultHTML);
+})
 // start server
 app.listen(PORT, HOST);
 console.log(`Running on http://${HOST}:${PORT}`);
