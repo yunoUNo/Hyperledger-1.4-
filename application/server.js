@@ -180,6 +180,7 @@ app.post('/asset', async(req,res)=>{
     res.status(200).send(resultHTML);
 })
 
+// 자산 조회
 app.get('/asset', async(req, res)=>{
     const key = req.query.key;
     const id = req.query.id;
@@ -223,6 +224,7 @@ app.get('/asset', async(req, res)=>{
     
 })
 
+// 자산조회의 이력확인
 app.get('/assets', async(req, res)=>{
     const key= req.query.key;
     const id= req.query.id;
@@ -267,6 +269,41 @@ app.get('/assets', async(req, res)=>{
     resultHTML = resultHTML.replace("<div></div>", `<div><p>Transaction has been evaluated:</p><br> ${tableHTML}</div>\n`);
     res.status(200).send(resultHTML);
 })
+
+// 자산조회의 전송
+app.post('/tx', async(req,res)=>{
+    const id = req.body.id;
+    const from = req.body.from;
+    const to = req.body.to;
+    const value = req.body.value;
+    console.log('/tx-post-'+id+'-'+from+'-'+to+'-'+value);
+
+    const walletPath = path.join(process.cwd(), 'wallet');
+    const wallet = new FileSystemWallet(walletPath);
+    console.log(`Wallet path: ${walletPath}`);
+    const userExists = await wallet.exists(id);
+    if(!userExists){
+        console.log(`An identity for the user ${id} does not exist in the wallet`);
+        req.status(401).sendFile(__dirname+ '/unauth.html');
+        return;
+    }
+    // gateway
+    const gateway = new Gateway();
+    await gateway.connect(ccp, { wallet, identity: id, discovery: { enabled: false}});
+    const network = await gateway.getNetwork('mychannel');
+    const contract = network.getContract('simpleasset');
+    await contract.submitTransaction('transfer', from, to, value);
+    console.log('Tx has been submitted');
+    await gateway.disconnect();
+
+    //result
+    const resultPath = path.join(process.cwd(), '/views/result.html')
+    var resultHTML = fs.readFileSync(resultPath, 'utf8');
+    resultHTML = resultHTML.replace("<div></div>", "<div><p>Tx has been submitted</p></div>");
+    res.status(200).send(resultHTML);
+})
+
+
 // start server
 app.listen(PORT, HOST);
 console.log(`Running on http://${HOST}:${PORT}`);

@@ -36,7 +36,7 @@
                     <br>
                     <button id="btn_history" class="btn btn-danger">이력확인</button>
                     <br><br>
-                    <a href="./tx" id="linkb" class="btn btn-danger" target="_blank">전송</a>
+                    <a href="./transfer.html"  class="btn btn-danger">전송</a>
                     <br>
                 </div>
         </div>
@@ -72,6 +72,14 @@
         $(document).ready(function(){
             $('#div-result').hide();
         })
+
+        $("#btn_transfer").click(()=>{
+            window.open(`/transfer`, '_blank')
+        })
+
+        $(document).ready(function(){
+            $('#div-result').hide();
+        });
 
     </script>
 </html>
